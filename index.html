@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>潜水艦パーツ 不足素材計算</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+:root{--bg:#eef3f4;--surface:#fff;--ink:#14272e;--sub:#5b6f76;--line:#cfdadd;--acc:#1f6f80;--warn:#b4430c;--ok:#2d7a4f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a1e;--surface:#16262c;--ink:#e6eef0;--sub:#9fb4ba;--line:#2a4048;--acc:#5cc1d4;--warn:#f0905a;--ok:#6cc896}}
+:root[data-theme="dark"]{--bg:#0f1a1e;--surface:#16262c;--ink:#e6eef0;--sub:#9fb4ba;--line:#2a4048;--acc:#5cc1d4;--warn:#f0905a;--ok:#6cc896}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;line-height:1.7}
+main{max-width:720px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.35rem;margin:0 0 4px}
+.note{color:var(--sub);font-size:.88rem;margin:0 0 16px}
+.sel{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.sel label{display:flex;gap:6px;align-items:center;font-weight:700}
+select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.sum{background:var(--surface);border:2px solid var(--acc);border-radius:10px;padding:12px 14px;margin-bottom:20px}
+.sum h2{font-size:1rem;margin:0 0 6px;color:var(--acc)}
+.sum h2.mkh{margin-top:12px;color:var(--ok)}
+.sum p{margin:2px 0;font-size:.92rem}
+.sum.el{border:1px solid var(--line)}
+.sum.el h2{color:var(--sub);font-size:.95rem}
+.el table{border-collapse:collapse;font-size:.88rem;width:100%}
+.el th,.el td{padding:3px 6px;text-align:right;border-bottom:1px solid var(--line)}
+.el th:first-child,.el td:first-child{text-align:left}
+.el th{color:var(--sub);font-weight:400}
+section{margin-bottom:22px}
+section h2{font-size:1.05rem;margin:0 0 8px;padding-left:10px;border-left:4px solid var(--acc)}
+.row{display:grid;grid-template-columns:1fr 64px 78px 112px;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px}
+.row.head{background:none;border:0;padding:0 10px;color:var(--sub);font-size:.78rem}
+.nm{font-weight:700;font-size:.95rem}
+input{width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);text-align:right}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.need{text-align:right}
+.short{text-align:right;font-weight:700}
+.short.n{color:var(--warn)}
+.short.z{color:var(--ok);font-weight:400;font-size:.85rem}
+.short small{display:block;font-weight:400;font-size:.72rem;color:var(--sub)}
+.short small.mk{color:var(--ok);font-weight:700}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+@media (max-width:480px){.row{grid-template-columns:1fr 52px 64px 100px;gap:6px;padding:8px}}
+</style>
+</head>
+<body>
+<main>
+<h1>潜水艦パーツ 不足素材計算</h1>
+<p class="note">パーツと工程を選び、手持ちを入力すると、手持ちを引いた不足数が上の階層から順に計算されます。レシピは、ページ末尾の「データ」に名前で書いたとおりです。</p>
+<div class="sel">
+<label>パーツ <select id="part"></select></label>
+<label>工程 <select id="stage"></select></label>
+</div>
+<div class="sum" id="sum"></div>
+<div class="sum el" id="el"></div>
+<div id="list"></div>
+<button id="reset" type="button">手持ちをリセット</button>
+</main>
+
+<!-- ===== データ（ここだけ直せば素材やパーツを増やせます） ===== -->
+<!-- パーツ：パーツ名の行、「工程：番号」の行、「納品素材×個数」の行 -->
+<script type="text/plain" id="d-parts">
+シーラカンス級艦橋
+工程：1
+ コバルトリベット×30
+ ミスライトインゴット×18
+ プラチナナゲット×12
+ コバルトフィッティング×30
+工程：2
+ ミスライトインゴット×30
+ コバルトプレート×18
+ ダークスチールリベット×18
+ タガヤサン材×9
+工程：3
+ チタンインゴット×30
+ ダークスチールリベット×18
+ ローズゴールドナゲット×30
+ ラリマール×12
+ トパーズ×6
+
+ウンキウ級艦尾
+工程：1
+ スチールリベット×24
+ コバルトインゴット×24
+ スチールインゴット×24
+ ガーロンド鋼×9
+工程：2
+ ミスリルリベット×30
+ ミスライトインゴット×18
+ コバルトフィッティング×30
+ ダークスチールインゴット×9
+工程：3
+ ミスリルリベット×30
+ ウォルフラムインゴット×18
+ ダークスチールプレート×18
+ ミスリルインゴット×30
+ ガラス板×30
+
+シルドラ級艦首
+工程：1
+ ダークスチールプレート×9
+ ダークスチールリベット×15
+ コバルトフィッティング×30
+ ミスライトインゴット×30
+工程：2
+ ダークスチールインゴット×15
+ ミスライトインゴット×30
+ ダークスチールリベット×15
+ ハードシルバーナゲット×18
+工程：3
+ カマサイト鋼×9
+ アダマンナゲット×15
+ アダマンリベット×15
+ オーラムレギスナゲット×15
+
+シーラカンス級艦体
+工程：1
+ コバルトリベット×30
+ コバルトプレート×18
+ ミスライトインゴット×30
+ ガーロンド鋼×9
+工程：2
+ ダークスチールリベット×30
+ ミスライトインゴット×18
+ ダークチェスナット材×30
+ 黒にかわ×12
+工程：3
+ チタンインゴット×30
+ コバルトフィッティング×30
+ ハードシルバーナゲット×18
+ オーラムレギスナゲット×18
+
+シャーク級艦体
+工程：1
+ ウォルナット材×18
+ スプルース材×18
+ アイアンネイル×18
+ コバルトインゴット×18
+工程：2
+ シーダー材×9
+ アイアンリベット×18
+ ミスリルプレート×18
+ エレクトラムインゴット×18
+ 鬼にかわ×18
+工程：3
+ ミスリルリベット×18
+ コバルトインゴット×18
+ ローズゴールドインゴット×21
+ ワニス×18
+
+シャーク級艦尾
+工程：1
+ スチールリベット×24
+ コバルトインゴット×18
+ スチールインゴット×24
+ コバルトフィッティング×24
+工程：2
+ スチールインゴット×30
+ ダークスチールインゴット×9
+ スチールフィッティング×30
+ コバルトインゴット×30
+工程：3
+ 神代木×9
+ ミスリルリベット×30
+ コバルトインゴット×30
+ シルバーインゴット×30
+
+シャーク級艦首
+工程：1
+ スチールインゴット×30
+ スチールリベット×30
+ コバルトフィッティング×30
+ コバルトインゴット×18
+工程：2
+ スチールリベット×30
+ スチールフィッティング×30
+ ダークスチールインゴット×12
+工程：3
+ 神代木×9
+ ミスリルリベット×30
+ シルバーインゴット×30
+
+シャーク級艦橋
+工程：1
+ 硬化スプルース材×12
+ ダークスチールナゲット×21
+ アイアンネイル×21
+ アイアンリベット×21
+工程：2
+ スチールインゴット×21
+ スチールリベット×21
+ ダークスチールインゴット×12
+ コバルトリベット×21
+工程：3
+ ダークスチールインゴット×12
+ コバルトインゴット×18
+ スチールリベット×21
+ エレクトラムインゴット×21
+</script>
+<!-- レシピ：作るもの×個数：材料×個数、材料×個数 -->
+<script type="text/plain" id="d-rec">
+コバルトリベット×1：コバルトインゴット×1、ファイアシャード×5、アイスシャード×5
+コバルトインゴット×1：鏡鉄鉱×2、鉄鉱×1、ファイアシャード×5、アイスシャード×5
+ミスライトインゴット×1：精霊銀鉱×4、ミスライトナゲット×1、ファイアクリスタル×3、アイスクリスタル×3、ウィンドクリスタル×3
+ミスライトナゲット×1：精霊銀砂×5、霊銀鉱×1、ファイアクリスタル×3、アイスクリスタル×3、ウィンドクリスタル×3
+プラチナナゲット×1：白金鉱×3、ウィンドクラスター×2、ファイアクラスター×1
+コバルトフィッティング×1：コバルトインゴット×1、アイスシャード×5
+コバルトプレート×1：コバルトインゴット×2、アイスシャード×5
+ダークスチールリベット×1：ダークスチールナゲット×1、ファイアクリスタル×3、アイスクリスタル×3
+ダークスチールナゲット×1：闇鉄鉱×3、ファイアクリスタル×3、アイスクリスタル×3
+タガヤサン材×1：鉄刀木×3、樹液塊×9、ウィンドクラスター×2、アイスクラスター×1
+チタンインゴット×1：白雲母×4、チタンナゲット×1、ファイアクリスタル×5、アイスクリスタル×5
+チタンナゲット×1：チタン鉱×5、鉄鉱×1、グレネードの灰×1、ファイアクリスタル×4、アイスクリスタル×4
+ローズゴールドナゲット×1：金鉱×3、銅鉱×1、ウィンドクリスタル×3
+ラリマール×1：ラリマール原石×3、卵砥石×1、ウィンドクリスタル×4
+卵砥石×1：バジリスクの卵×1、ウィンドシャード×5
+トパーズ×1：金剛砂×1、ウィンドクラスター×2、ファイアクラスター×1
+スチールリベット×1：スチールインゴット×1、ファイアシャード×3、アイスシャード×3
+スチールインゴット×1：ボムの灰×1、鉄鉱×2、ファイアシャード×2、アイスシャード×2
+ガーロンド鋼×1：藍鉄鉱×3、コークス×9、鏡鉄鉱×3、ファイアクラスター×1、アイスクラスター×1、アースクラスター×1
+ミスリルリベット×1：ミスリルインゴット×1、ファイアシャード×5、アイスシャード×4
+ミスリルインゴット×1：霊銀鉱×3、ファイアシャード×4、アイスシャード×4、ウィンドシャード×4
+ダークスチールインゴット×1：ダークスチールナゲット×2、コークス×9、ファイアクラスター×1、アイスクラスター×1
+ウォルフラムインゴット×1：灰重石×1、鉄重石×1、鏡鉄鉱×1、ファイアクラスター×2、アースクラスター×1
+ダークスチールプレート×1：ダークスチールナゲット×2、アイスクリスタル×3
+ガラス板×1：珪砂×1、重曹×1、ウォーターシャード×3
+ハードシルバーナゲット×1：硬銀砂×5、銀鉱×1、ウィンドクリスタル×4
+カマサイト鋼×1：カマサイト鉱石×3、コークス×9、鏡鉄鉱×3、ファイアクリスタル×7、アイスクリスタル×7、アースクリスタル×7
+アダマンナゲット×1：アダマン鉱×5、闇鉄鉱×1、ファイアクリスタル×5、アイスクリスタル×5
+アダマンリベット×1：アダマンナゲット×1、ファイアクリスタル×5、アイスクリスタル×5
+オーラムレギスナゲット×1：皇金砂×5、金鉱×1、ウィンドクリスタル×5
+ダークチェスナット材×1：ダークチェスナット原木×5、ウィンドクリスタル×4
+黒にかわ×1：ジェラートの肉×3、プリンの肉×2、ウォータークリスタル×3
+ウォルナット材×1：ウォルナット原木×3、ウィンドシャード×2
+スプルース材×1：スプルース原木×3、ウィンドクリスタル×3
+アイアンネイル×1：アイアンインゴット×1、ファイアシャード×1
+アイアンインゴット×1：鉄鉱×3、ファイアシャード×1、アイスシャード×1
+シーダー材×1：シーダー原木×5、ウィンドクリスタル×3
+アイアンリベット×1：アイアンインゴット×1、ファイアシャード×1、アイスシャード×1
+ミスリルプレート×1：ミスリルインゴット×2、アイスシャード×4
+エレクトラムインゴット×1：青金鉱×4、ウィンドシャード×5
+鬼にかわ×1：アルドゴートの角×2、ウォーターシャード×3
+ローズゴールドインゴット×1：ローズゴールドナゲット×2、斑銅鉱×9、ウィンドクラスター×1
+ワニス×1：アンバー原石×2、リンシードオイル×1、テレビン油×1、ウォーターシャード×5
+スチールフィッティング×1：スチールインゴット×1、アイスシャード×3
+神代木×1：珪化木×1、緋樹液×1、ウィンドクラスター×2、アイスクラスター×1
+シルバーインゴット×1：銀鉱×3、ウィンドシャード×2
+硬化スプルース材×1：スプルース材×2、樹液塊×9、ウィンドクラスター×1
+</script>
+
+<script>
+const $=id=>document.getElementById(id);
+const KINDS=[['d','納品素材'],['m','中間素材'],['r','末端素材']];
+// 素材一覧に出さず、補足として必要数だけ表示する属性素材
+const ELEM=/^(ファイア|アイス|ウィンド|ウォーター|ライトニング|アース)(シャード|クリスタル|クラスター)$/;
+const isEl=n=>ELEM.test(n);
+function term(s){const m=s.trim().match(/^(.+?)\s*[×x]\s*(\d+)$/);return m?[m[1].trim(),+m[2]]:null}
+// レシピ
+const REC={};
+$('d-rec').textContent.split('\n').forEach(l=>{const p=l.split(/[：:]/);if(p.length<2)return;const o=term(p[0]);if(!o)return;
+const ins=p.slice(1).join(':').split(/[、,]/).map(term).filter(Boolean);if(ins.length)REC[o[0]]={yield:o[1],inputs:ins}});
+// パーツ
+const PARTS=[];let cur,stg=0;
+$('d-parts').textContent.split('\n').forEach(l=>{l=l.trim();if(!l)return;
+const m=l.match(/^工程[：:]\s*(\d+)/);if(m){stg=+m[1];return}
+const t=term(l);if(t){if(cur)cur.items.push({stage:stg,name:t[0],qty:t[1]});return}
+cur={name:l,items:[]};PARTS.push(cur);stg=0});
+// 素材名の一覧と、使う側から先に処理する順序
+const NAMES=new Set();
+Object.entries(REC).forEach(([k,r])=>{NAMES.add(k);r.inputs.forEach(([c])=>NAMES.add(c))});
+PARTS.forEach(p=>p.items.forEach(i=>NAMES.add(i.name)));
+const IDX={};[...NAMES].forEach((n,i)=>IDX[n]=i);
+const ORDER=(()=>{const d={};NAMES.forEach(n=>d[n]=0);
+Object.values(REC).forEach(r=>r.inputs.forEach(([c])=>d[c]++));
+const q=[...NAMES].filter(n=>!d[n]),o=[];
+while(q.length){const n=q.shift();o.push(n);(REC[n]?REC[n].inputs:[]).forEach(([c])=>{if(--d[c]===0)q.push(c)})}
+return o})();
+// 状態の保存
+const KEY='fc-subs-v2';
+let state={part:PARTS[0].name,stage:'all',stock:{}};
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)state=Object.assign(state,s)}catch(e){}
+if(!PARTS.some(p=>p.name===state.part))state.part=PARTS[0].name;
+state.stock=state.stock||{};
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function curPart(){return PARTS.find(p=>p.name===state.part)}
+function deliveries(){const d={};curPart().items.forEach(i=>{if(state.stage==='all'||+state.stage===i.stage)d[i.name]=(d[i.name]||0)+i.qty});return d}
+// 不足の計算と、今の手持ちで作れる数の計算
+function calc(){
+const dl=deliveries(),need={},res={};NAMES.forEach(n=>need[n]=dl[n]||0);
+ORDER.forEach(n=>{const r=REC[n],have=state.stock[n]||0,short=Math.max(0,need[n]-have);let crafts=0;
+if(r){crafts=Math.ceil(short/r.yield);r.inputs.forEach(([c,q])=>need[c]+=crafts*q)}
+res[n]={need:need[n],short,crafts,now:0}});
+const rem={};NAMES.forEach(n=>rem[n]=Math.min(res[n].need,state.stock[n]||0));
+[...ORDER].reverse().forEach(n=>{const r=REC[n],x=res[n];
+if(r&&x.crafts>0){const ins=r.inputs.filter(([c])=>!isEl(c));let t=x.crafts;ins.forEach(([c,q])=>{t=Math.min(t,Math.floor(rem[c]/q))});
+ins.forEach(([c,q])=>rem[c]-=t*q);x.now=Math.min(x.short,t*r.yield);rem[n]+=x.now}});
+return{res,dl}}
+let VIS=[],DL={};
+const kind=n=>DL[n]>0?'d':REC[n]?'m':'r';
+function build(){
+DL=deliveries();
+const reach=new Set(),st=Object.keys(DL);
+while(st.length){const n=st.pop();if(reach.has(n))continue;reach.add(n);(REC[n]?REC[n].inputs:[]).forEach(([c])=>st.push(c))}
+VIS=ORDER.filter(n=>reach.has(n)&&!isEl(n));
+$('list').innerHTML=KINDS.map(([k,label])=>{const rows=VIS.filter(n=>kind(n)===k);if(!rows.length)return'';
+return '<section><h2>'+label+'</h2><div class="row head"><span>素材</span><span class="need">必要数</span><span class="need">手持ち</span><span class="short">不足</span></div>'+
+rows.map(n=>'<div class="row"><span class="nm">'+n+'</span><span class="need" id="n-'+IDX[n]+'"></span><input type="number" min="0" inputmode="numeric" data-stock="'+n+'" aria-label="'+n+'の手持ち" value="'+(state.stock[n]||'')+'"><span class="short" id="s-'+IDX[n]+'"></span></div>').join('')+'</section>'}).join('');
+update()}
+const ELS=['ファイア','アイス','ウィンド','ウォーター','ライトニング','アース'],ELT=['シャード','クリスタル','クラスター'];
+function renderEl(r){
+const nd=(e,t)=>(r[e+t]||{need:0}).need;
+const rows=ELS.filter(e=>ELT.some(t=>nd(e,t)>0));
+$('el').innerHTML='<h2>補足：属性素材の必要数</h2>'+(rows.length?'<table><tr><th></th>'+ELT.map(t=>'<th>'+t+'</th>').join('')+'</tr>'+rows.map(e=>'<tr><td>'+e+'</td>'+ELT.map(t=>'<td>'+(nd(e,t)||'-')+'</td>').join('')+'</tr>').join('')+'</table><p class="note" style="margin:6px 0 0">手持ちの素材で作れる分を引いた、これから作る分に必要な数です。</p>':'<p>必要な属性素材はありません。</p>')}
+function update(){
+const r=calc().res;renderEl(r);
+VIS.forEach(n=>{const x=r[n],i=IDX[n],s=$('s-'+i);$('n-'+i).textContent=x.need;
+if(x.short===0){s.className='short z';s.textContent='足りています'}
+else{s.className='short n';s.innerHTML=x.short+'個'+(REC[n]?'<small>製作'+x.crafts+'回</small>'+(x.now>=x.short?'<small class="mk">全部作れます</small>':x.now>0?'<small class="mk">今作れる '+x.now+'個</small>':''):'')}});
+const lines=KINDS.map(([k,label])=>{const p=VIS.filter(n=>kind(n)===k&&r[n].short>0).map(n=>n+' '+r[n].short+'個');
+return p.length?'<p><b>'+label+'</b>：'+p.join('、')+'</p>':''}).join('');
+const mk=[...ORDER].reverse().filter(n=>VIS.includes(n)&&r[n].now>0).map(n=>'<p>'+n+' '+r[n].now+'個'+(r[n].now>=r[n].short?'（不足ぶんすべて）':'')+'</p>').join('');
+$('sum').innerHTML='<h2>不足まとめ</h2>'+(lines||'<p>不足はありません。</p>')+(mk?'<h2 class="mkh">いま手持ちの素材で作れるもの（上から順に製作）</h2>'+mk:'')}
+function stageOpts(){
+const ss=[...new Set(curPart().items.map(i=>i.stage))].sort((a,b)=>a-b);
+$('stage').innerHTML='<option value="all">全工程</option>'+ss.map(s=>'<option value="'+s+'">工程'+s+'</option>').join('');
+if(state.stage!=='all'&&!ss.includes(+state.stage))state.stage='all';
+$('stage').value=state.stage}
+$('part').innerHTML=PARTS.map(p=>'<option>'+p.name+'</option>').join('');
+$('part').value=state.part;
+$('part').addEventListener('change',e=>{state.part=e.target.value;state.stage='all';stageOpts();save();build()});
+$('stage').addEventListener('change',e=>{state.stage=e.target.value;save();build()});
+$('list').addEventListener('input',e=>{const n=e.target.dataset.stock;if(!n)return;state.stock[n]=Math.max(0,parseInt(e.target.value,10)||0);save();update()});
+$('reset').addEventListener('click',()=>{state.stock={};save();build()});
+stageOpts();build();
+</script>
+</body>
+</html>
