@@ -50,7 +50,8 @@ button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--li
 <h1>潜水艦パーツ 不足素材計算</h1>
 <p class="note">パーツと工程を選び、手持ちを入力すると、手持ちを引いた不足数が上の階層から順に計算されます。レシピは、ページ末尾の「データ」に名前で書いたとおりです。</p>
 <div class="sel">
-<label>パーツ <select id="part"></select></label>
+<label>級 <select id="cls"></select></label>
+<label>パーツ <select id="ptype"></select></label>
 <label>工程 <select id="stage"></select></label>
 </div>
 <div class="sum" id="sum"></div>
@@ -267,6 +268,13 @@ $('d-parts').textContent.split('\n').forEach(l=>{l=l.trim();if(!l)return;
 const m=l.match(/^工程[：:]\s*(\d+)/);if(m){stg=+m[1];return}
 const t=term(l);if(t){if(cur)cur.items.push({stage:stg,name:t[0],qty:t[1]});return}
 cur={name:l,items:[]};PARTS.push(cur);stg=0});
+// パーツ名を「級」と「艦体・艦尾・艦首・艦橋」に分ける
+const TYPES=['艦体','艦尾','艦首','艦橋'];
+// 「級」の並び順（ここに書いていない級は、最後に追加順で並びます）
+const CLASS_ORDER=['シャーク級','ウンキウ級','シーラカンス級','シルドラ級','ホエール級'];
+PARTS.forEach(p=>{const m=p.name.match(/(艦体|艦尾|艦首|艦橋)$/);p.type=m?m[1]:'';p.cls=m?p.name.slice(0,m.index):p.name});
+const ALLCLS=[...new Set(PARTS.map(p=>p.cls))];
+const CLASSES=[...CLASS_ORDER.filter(c=>ALLCLS.includes(c)),...ALLCLS.filter(c=>!CLASS_ORDER.includes(c))];
 // 素材名の一覧と、使う側から先に処理する順序
 const NAMES=new Set();
 Object.entries(REC).forEach(([k,r])=>{NAMES.add(k);r.inputs.forEach(([c])=>NAMES.add(c))});
@@ -327,9 +335,13 @@ const ss=[...new Set(curPart().items.map(i=>i.stage))].sort((a,b)=>a-b);
 $('stage').innerHTML='<option value="all">全工程</option>'+ss.map(s=>'<option value="'+s+'">工程'+s+'</option>').join('');
 if(state.stage!=='all'&&!ss.includes(+state.stage))state.stage='all';
 $('stage').value=state.stage}
-$('part').innerHTML=PARTS.map(p=>'<option>'+p.name+'</option>').join('');
-$('part').value=state.part;
-$('part').addEventListener('change',e=>{state.part=e.target.value;state.stage='all';stageOpts();save();build()});
+function typesOf(c){const ts=PARTS.filter(p=>p.cls===c).map(p=>p.type);return [...TYPES.filter(t=>ts.includes(t)),...ts.filter(t=>!TYPES.includes(t))]}
+function typeOpts(){$('ptype').innerHTML=typesOf($('cls').value).map(t=>'<option value="'+t+'">'+(t||'（なし）')+'</option>').join('')}
+function pick(c,t){const p=PARTS.find(x=>x.cls===c&&x.type===t)||PARTS.find(x=>x.cls===c);state.part=p.name;state.stage='all'}
+$('cls').innerHTML=CLASSES.map(c=>'<option>'+c+'</option>').join('');
+$('cls').value=curPart().cls;typeOpts();$('ptype').value=curPart().type;
+$('cls').addEventListener('change',e=>{const old=curPart().type;typeOpts();const ts=typesOf(e.target.value),t=ts.includes(old)?old:ts[0];$('ptype').value=t;pick(e.target.value,t);stageOpts();save();build()});
+$('ptype').addEventListener('change',e=>{pick($('cls').value,e.target.value);stageOpts();save();build()});
 $('stage').addEventListener('change',e=>{state.stage=e.target.value;save();build()});
 $('list').addEventListener('input',e=>{const n=e.target.dataset.stock;if(!n)return;state.stock[n]=Math.max(0,parseInt(e.target.value,10)||0);save();update()});
 $('reset').addEventListener('click',()=>{state.stock={};save();build()});
