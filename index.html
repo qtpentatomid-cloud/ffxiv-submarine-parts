@@ -17,6 +17,9 @@ h1{font-size:1.35rem;margin:0 0 4px}
 .note{color:var(--sub);font-size:.88rem;margin:0 0 16px}
 .sel{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .sel label{display:flex;gap:6px;align-items:center;font-weight:700}
+.plan{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 16px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--acc);border-radius:999px;padding:3px 6px 3px 12px;font-size:.88rem}
+.chip button{padding:0 8px;border-radius:999px;line-height:1.6}
 select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
 .sum{background:var(--surface);border:2px solid var(--acc);border-radius:10px;padding:12px 14px;margin-bottom:20px}
 .sum h2{font-size:1rem;margin:0 0 6px;color:var(--acc)}
@@ -51,12 +54,14 @@ button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--li
 <body>
 <main>
 <h1>潜水艦パーツ 不足素材計算</h1>
-<p class="note">パーツと工程を選び、手持ちを入力すると、手持ちを引いた不足数が上の階層から順に計算されます。レシピは、ページ末尾の「データ」に名前で書いたとおりです。</p>
+<p class="note">パーツと工程を選んで「追加」を押すと、追加したパーツすべての材料が合算されます。手持ちを入力すると、手持ちを引いた不足数が上の階層から順に計算されます。レシピは、ページ末尾の「データ」に名前で書いたとおりです。</p>
 <div class="sel">
 <label>級 <select id="cls"></select></label>
 <label>パーツ <select id="ptype"></select></label>
 <label>工程 <select id="stage"></select></label>
+<button id="add" type="button">追加</button>
 </div>
+<div id="plan" class="plan"></div>
 <div class="sum" id="sum"></div>
 <div class="sum el" id="el"></div>
 <div class="sum el" id="cur"></div>
@@ -657,9 +662,11 @@ let state={part:PARTS[0].name,stage:'all',stock:{}};
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)state=Object.assign(state,s)}catch(e){}
 if(!PARTS.some(p=>p.name===state.part))state.part=PARTS[0].name;
 state.stock=state.stock||{};
+if(!Array.isArray(state.plan))state.plan=[{part:state.part,stage:state.stage}];
+state.plan=state.plan.filter(e=>PARTS.some(p=>p.name===e.part));
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 function curPart(){return PARTS.find(p=>p.name===state.part)}
-function deliveries(){const d={};curPart().items.forEach(i=>{if(state.stage==='all'||+state.stage===i.stage)d[i.name]=(d[i.name]||0)+i.qty});return d}
+function deliveries(){const d={};state.plan.forEach(e=>{const p=PARTS.find(x=>x.name===e.part);if(!p)return;p.items.forEach(i=>{if(e.stage==='all'||+e.stage===i.stage)d[i.name]=(d[i.name]||0)+i.qty})});return d}
 // 不足の計算と、今の手持ちで作れる数の計算
 function calc(){
 const dl=deliveries(),need={},res={};NAMES.forEach(n=>need[n]=dl[n]||0);
@@ -701,7 +708,7 @@ else{s.className='short n';s.innerHTML=x.short+'個'+(REC[n]?'<small>製作'+x.c
 const lines=KINDS.map(([k,label])=>{const p=VIS.filter(n=>kind(n)===k&&r[n].short>0).map(n=>n+' '+r[n].short+'個');
 return p.length?'<p><b>'+label+'</b>：'+p.join('、')+'</p>':''}).join('');
 const mk=[...ORDER].reverse().filter(n=>VIS.includes(n)&&r[n].now>0).map(n=>'<p>'+n+' '+r[n].now+'個'+(r[n].now>=r[n].short?'（不足ぶんすべて）':'')+'</p>').join('');
-$('sum').innerHTML='<h2>不足まとめ</h2>'+(lines||'<p>不足はありません。</p>')+(mk?'<h2 class="mkh">いま手持ちの素材で作れるもの（上から順に製作）</h2>'+mk:'')}
+$('sum').innerHTML='<h2>不足まとめ</h2>'+(lines||(state.plan.length?'<p>不足はありません。</p>':'<p>パーツを追加してください。</p>'))+(mk?'<h2 class="mkh">いま手持ちの素材で作れるもの（上から順に製作）</h2>'+mk:'')}
 function stageOpts(){
 const ss=[...new Set(curPart().items.map(i=>i.stage))].sort((a,b)=>a-b);
 $('stage').innerHTML='<option value="all">全工程</option>'+ss.map(s=>'<option value="'+s+'">工程'+s+'</option>').join('');
@@ -712,9 +719,9 @@ function typeOpts(){$('ptype').innerHTML=typesOf($('cls').value).map(t=>'<option
 function pick(c,t){const p=PARTS.find(x=>x.cls===c&&x.type===t)||PARTS.find(x=>x.cls===c);state.part=p.name;state.stage='all'}
 $('cls').innerHTML=CLASSES.map(c=>'<option>'+c+'</option>').join('');
 $('cls').value=curPart().cls;typeOpts();$('ptype').value=curPart().type;
-$('cls').addEventListener('change',e=>{const old=curPart().type;typeOpts();const ts=typesOf(e.target.value),t=ts.includes(old)?old:ts[0];$('ptype').value=t;pick(e.target.value,t);stageOpts();save();build()});
-$('ptype').addEventListener('change',e=>{pick($('cls').value,e.target.value);stageOpts();save();build()});
-$('stage').addEventListener('change',e=>{state.stage=e.target.value;save();build()});
+$('cls').addEventListener('change',e=>{const old=curPart().type;typeOpts();const ts=typesOf(e.target.value),t=ts.includes(old)?old:ts[0];$('ptype').value=t;pick(e.target.value,t);stageOpts();save()});
+$('ptype').addEventListener('change',e=>{pick($('cls').value,e.target.value);stageOpts();save()});
+$('stage').addEventListener('change',e=>{state.stage=e.target.value;save()});
 $('list').addEventListener('input',e=>{const n=e.target.dataset.stock;if(!n)return;state.stock[n]=Math.max(0,parseInt(e.target.value,10)||0);save();update()});
 $('reset').addEventListener('click',()=>{state.stock={};save();build()});
 // 素材名のポップアップ（PCはカーソル、スマホはタップ）
@@ -734,7 +741,11 @@ $('list').addEventListener('focusin',e=>{const el=tipEl(e);if(el)showTip(el)});
 $('list').addEventListener('focusout',e=>{if(tipEl(e))hideTip()});
 document.addEventListener('click',e=>{if(!tipEl(e))hideTip()});
 addEventListener('scroll',hideTip,true);
-stageOpts();build();
+function renderPlan(){
+$('plan').innerHTML=state.plan.length?state.plan.map((e,i)=>'<span class="chip">'+e.part+'（'+(e.stage==='all'?'全工程':'工程'+e.stage)+'）<button type="button" data-rm="'+i+'" aria-label="'+e.part+'を外す">×</button></span>').join(''):'<span class="note">パーツが追加されていません。上で選んで「追加」を押してください。</span>'}
+$('add').addEventListener('click',()=>{state.plan.push({part:state.part,stage:state.stage});save();renderPlan();build()});
+$('plan').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;state.plan.splice(+b.dataset.rm,1);save();renderPlan();build()});
+renderPlan();stageOpts();build();
 </script>
 </body>
 </html>
